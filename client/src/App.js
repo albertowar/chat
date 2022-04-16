@@ -4,37 +4,67 @@ import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import './App.css';
 
-const defaultMessage = "Type here to send messages";
+const defaultMessage = 'Type here to send messages';
 const username = `User ${Math.floor(Math.random() * (1000 - 0 + 1))}`;
 
-const App = () => {  
-  const [content, setContent] = React.useState("");
+function App() {
+  const [content, setContent] = React.useState('');
   const [input, setInput] = React.useState(defaultMessage);
+  const [webSocket, setWebSocket] = React.useState({ readyState: WebSocket.CLOSED });
+
+  React.useEffect(() => {
+    if (!webSocket || webSocket.readyState === WebSocket.CLOSED) {
+      console.log('Attempted to connect');
+      const ws = new WebSocket(`ws://localhost:8080?user=${username}`);
+      console.log('After connection attempt');
+
+      ws.onopen = () => {
+        console.log('Connected');
+      };
+
+      ws.onclose = () => {
+        console.log('Disconnected');
+      };
+
+      setWebSocket(ws);
+    }
+  }, [webSocket.readyState]);
+
+  if (webSocket) {
+    webSocket.onmessage = (message) => {
+      const messageJson = JSON.parse(message.data);
+      const newContent = `${content}${messageJson.user}: ${messageJson.message}\n`;
+      setContent(newContent);
+    };
+  }
+
   const handleChange = (event) => {
     setInput(event.target.value);
   };
 
-  const handleClick = (_) => {
-    if (input === "") {
+  const handleClick = () => {
+    if (input === '') {
       return;
     }
 
-    const newContent = `${content}\n${username}: ${input}`;
-    setInput("");
-    setContent(newContent);
+    if (webSocket.readyState === WebSocket.OPEN) {
+      webSocket.send(JSON.stringify({ user: username, message: input }));
+    }
+
+    setInput('');
   };
 
   const handleEnter = (event) => {
-    if (event.key === "Enter") {
-      handleClick()
+    if (event.key === 'Enter') {
+      handleClick();
     }
-  }
+  };
 
   const clearIfDefault = () => {
     if (input === defaultMessage) {
-      setInput("");
+      setInput('');
     }
-  }
+  };
 
   return (
     <div className="App">
@@ -49,19 +79,20 @@ const App = () => {
           />
         </Grid>
         <Grid container direction="row" alignItems="center" justifyContent="space-between">
-          <Grid xs={11}>
-            <TextField 
+          <Grid item xs={11}>
+            <TextField
               fullWidth
-              id="input" 
-              color="success" 
+              id="input"
+              color="success"
               onChange={handleChange}
               onKeyUp={handleEnter}
               onClick={clearIfDefault}
               value={input}
-              focused />
+              focused
+            />
           </Grid>
-          <Grid xs={1}>
-            <Button variant="text" variant="contained" sx={{ height: "100%"}} onClick={handleClick}>Send</Button>
+          <Grid item xs={1}>
+            <Button variant="contained" sx={{ height: '100%' }} onClick={handleClick}>Send</Button>
           </Grid>
         </Grid>
       </Grid>
